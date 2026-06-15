@@ -50,3 +50,23 @@ class ScoreItem(BaseModel):
 class CheckInResponse(BaseModel):
     user_id: str
     scores: list[ScoreItem]
+
+
+# --- Nearby locations schemas ---
+
+
+class NearbyLocationItem(BaseModel):
+    id: int
+    lat: float
+    lon: float
+    place_name: str
+    district: str
+    location_type: str
+    score: int
+    distance_m: float
+    visited: bool
+
+
+class NearbyResponse(BaseModel):
+    user_id: str
+    locations: list[NearbyLocationItem]

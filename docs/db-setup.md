@@ -51,20 +51,51 @@ CREATE TABLE locations (
     district VARCHAR(255) NOT NULL,
     state VARCHAR(255) NOT NULL,
     place_name VARCHAR(255) NOT NULL,
+    location_type VARCHAR(100) NOT NULL,
     score INTEGER DEFAULT 0
+);"
+psql -U trvlr_admin -d trvlr_db -c "ALTER TABLE locations ADD CONSTRAINT unique_place_name UNIQUE (place_name);"
+```## 6. Add Unique Constraint on place_name
+
+```bash
+psql -U trvlr_admin -d trvlr_db -c "ALTER TABLE locations ADD CONSTRAINT unique_place_name UNIQUE (place_name);"
+```
+
+## 7. Create Visits Table
+
+```bash
+psql -U trvlr_admin -d trvlr_db -c "
+CREATE TABLE visits (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    location_id INTEGER NOT NULL REFERENCES locations(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    score INTEGER DEFAULT 0,
+    CONSTRAINT unique_user_location UNIQUE (user_id, location_id)
 );"
 ```
 
 ### Schema
 
-| Column      | Type                    | Notes                          |
-|-------------|-------------------------|--------------------------------|
-| id          | SERIAL (auto increment) | Primary key                    |
-| coordinates | GEOGRAPHY(POINT, 4326)  | PostGIS lat/long point         |
-| district    | VARCHAR(255)            | District name                  |
-| state       | VARCHAR(255)            | State name                     |
-| place_name  | VARCHAR(255)            | Name of the place              |
-| score       | INTEGER                 | Default 0, rating/popularity   |
+| Column      | Type         | Notes                                    |
+|-------------|--------------|------------------------------------------|
+| id          | SERIAL       | Primary key                              |
+| user_id     | VARCHAR(255) | Identifier of the user                   |
+| location_id | INTEGER      | FK to locations.id                       |
+| created_at  | TIMESTAMP    | Defaults to now                          |
+| score       | INTEGER      | Default 0, points earned for this visit  |
+
+### Schema
+
+| Column        | Type                    | Notes                          |
+|---------------|-------------------------|--------------------------------|
+| id            | SERIAL (auto increment) | Primary key                    |
+| coordinates   | GEOGRAPHY(POINT, 4326)  | PostGIS lat/long point         |
+| district      | VARCHAR(255)            | District name                  |
+| state         | VARCHAR(255)            | State name                     |
+| place_name    | VARCHAR(255)            | Name of the place              |
+| location_type | VARCHAR(100)            | e.g. tourism:attraction, natural:waterfall |
+| score         | INTEGER                 | Default 0, rating/popularity   |
 
 ## Connection String
 
@@ -110,6 +141,7 @@ CREATE TABLE locations (
     district VARCHAR(255) NOT NULL,
     state VARCHAR(255) NOT NULL,
     place_name VARCHAR(255) NOT NULL,
+    location_type VARCHAR(100) NOT NULL,
     score INTEGER DEFAULT 0
 );"
 ```

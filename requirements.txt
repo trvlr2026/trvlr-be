@@ -5,3 +5,4 @@ psycopg2-binary==2.9.10
 pydantic-settings==2.7.0
 geoalchemy2==0.17.1
 shapely==2.1.2
+requests==2.34.2

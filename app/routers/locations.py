@@ -1,4 +1,3 @@
-from geoalchemy2.functions import ST_X, ST_Y
 from geoalchemy2.shape import to_shape
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -17,6 +16,7 @@ async def create_location(payload: LocationCreate, db: Session = Depends(get_db)
         district=payload.district,
         state=payload.state,
         place_name=payload.place_name,
+        location_type=payload.location_type,
         score=payload.score,
     )
     db.add(location)
@@ -31,5 +31,6 @@ async def create_location(payload: LocationCreate, db: Session = Depends(get_db)
         district=location.district,
         state=location.state,
         place_name=location.place_name,
+        location_type=location.location_type,
         score=location.score,
     )

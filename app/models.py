@@ -1,5 +1,7 @@
+from datetime import datetime
+
 from geoalchemy2 import Geography
-from sqlalchemy import Integer, String
+from sqlalchemy import Integer, String, ForeignKey, UniqueConstraint, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -12,5 +14,19 @@ class Location(Base):
     coordinates = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=False)
     district: Mapped[str] = mapped_column(String(255))
     state: Mapped[str] = mapped_column(String(255))
-    place_name: Mapped[str] = mapped_column(String(255))
+    place_name: Mapped[str] = mapped_column(String(255), unique=True)
+    location_type: Mapped[str] = mapped_column(String(100))
+    score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class Visit(Base):
+    __tablename__ = "visits"
+    __table_args__ = (
+        UniqueConstraint("user_id", "location_id", name="unique_user_location"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, server_default="now()")
     score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

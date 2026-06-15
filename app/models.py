@@ -30,3 +30,10 @@ class Visit(Base):
     location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, server_default="now()")
     score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class UserScore(Base):
+    __tablename__ = "user_scores"
+
+    user_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

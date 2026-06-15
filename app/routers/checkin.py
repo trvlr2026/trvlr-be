@@ -14,8 +14,10 @@ async def checkin(payload: CheckInRequest, db: Session = Depends(get_db)):
     """
     For each coordinate, find a location within 100m.
     Award score on first visit, return reason if already visited.
+    Also updates user_scores with the total earned.
     """
     scores: list[ScoreItem] = []
+    total_earned = 0
 
     for coord in payload.coordinates:
         # Find the closest location within 100 meters
@@ -55,7 +57,7 @@ async def checkin(payload: CheckInRequest, db: Session = Depends(get_db)):
         ).fetchone()
 
         if existing_visit:
-            # Already visited — return with earned_score=0 and reason
+            # Already visited
             scores.append(
                 ScoreItem(
                     lat=location_lat,
@@ -74,6 +76,7 @@ async def checkin(payload: CheckInRequest, db: Session = Depends(get_db)):
                 score=location_score,
             )
             db.add(visit)
+            total_earned += location_score
 
             scores.append(
                 ScoreItem(
@@ -85,6 +88,18 @@ async def checkin(payload: CheckInRequest, db: Session = Depends(get_db)):
                     reason=None,
                 )
             )
+
+    # Update user_scores with total earned this session
+    if total_earned > 0:
+        db.execute(
+            text("""
+                INSERT INTO user_scores (user_id, score)
+                VALUES (:user_id, :score)
+                ON CONFLICT (user_id)
+                DO UPDATE SET score = user_scores.score + :score
+            """),
+            {"user_id": payload.user_id, "score": total_earned},
+        )
 
     db.commit()
 

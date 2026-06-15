@@ -70,3 +70,17 @@ class NearbyLocationItem(BaseModel):
 class NearbyResponse(BaseModel):
     user_id: str
     locations: list[NearbyLocationItem]
+
+
+# --- Leaderboard schemas ---
+
+
+class LeaderboardEntry(BaseModel):
+    user_id: str
+    score: int
+
+
+class LeaderboardResponse(BaseModel):
+    page: int
+    page_size: int
+    results: list[LeaderboardEntry]

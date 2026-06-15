@@ -75,6 +75,16 @@ CREATE TABLE visits (
 );"
 ```
 
+## 8. Create User Scores Table
+
+```bash
+psql -U trvlr_admin -d trvlr_db -c "
+CREATE TABLE user_scores (
+    user_id VARCHAR(255) PRIMARY KEY,
+    score INTEGER DEFAULT 0
+);"
+```
+
 ### Schema
 
 | Column      | Type         | Notes                                    |

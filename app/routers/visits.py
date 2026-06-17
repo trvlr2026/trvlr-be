@@ -3,7 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import UserVisitsResponse, VisitItem
+from app.schemas import UserVisitsResponse, VisitItem, VisitLocationItem
 
 router = APIRouter(tags=["visits"])
 
@@ -16,7 +16,7 @@ async def get_user_visits(
     db: Session = Depends(get_db),
 ):
     """
-    Return paginated list of all visits by a user with location details.
+    Return paginated list of all visits by a user with nested location details.
     """
     offset = (page - 1) * page_size
 
@@ -24,14 +24,15 @@ async def get_user_visits(
         text("""
             SELECT
                 v.location_id,
+                v.photo_id,
+                v.score as visit_score,
+                v.created_at,
                 l.place_name,
                 l.district,
                 l.location_type,
+                l.score as location_score,
                 ST_Y(l.coordinates::geometry) as lat,
-                ST_X(l.coordinates::geometry) as lon,
-                v.photo_id,
-                v.score,
-                v.created_at
+                ST_X(l.coordinates::geometry) as lon
             FROM visits v
             JOIN locations l ON l.id = v.location_id
             WHERE v.user_id = :user_id
@@ -43,15 +44,18 @@ async def get_user_visits(
 
     items = [
         VisitItem(
-            location_id=row.location_id,
-            place_name=row.place_name,
-            district=row.district,
-            location_type=row.location_type,
-            lat=row.lat,
-            lon=row.lon,
             photo_id=row.photo_id or "",
-            score=row.score,
+            score=row.visit_score,
             visited_at=row.created_at.isoformat() if row.created_at else "",
+            location=VisitLocationItem(
+                id=row.location_id,
+                lat=row.lat,
+                lon=row.lon,
+                place_name=row.place_name,
+                district=row.district,
+                location_type=row.location_type,
+                score=row.location_score,
+            ),
         )
         for row in results
     ]

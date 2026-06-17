@@ -90,16 +90,21 @@ class LeaderboardResponse(BaseModel):
 # --- User visits schemas ---
 
 
-class VisitItem(BaseModel):
-    location_id: int
+class VisitLocationItem(BaseModel):
+    id: int
+    lat: float
+    lon: float
     place_name: str
     district: str
     location_type: str
-    lat: float
-    lon: float
+    score: int
+
+
+class VisitItem(BaseModel):
     photo_id: str
     score: int
     visited_at: str
+    location: VisitLocationItem
 
 
 class UserVisitsResponse(BaseModel):

@@ -38,3 +38,11 @@ class UserScore(Base):
 
     user_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class Place(Base):
+    __tablename__ = "places"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    district: Mapped[str] = mapped_column(String(255), unique=True)
+    state: Mapped[str] = mapped_column(String(255))

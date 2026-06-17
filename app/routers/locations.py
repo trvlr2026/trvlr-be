@@ -1,12 +1,68 @@
 from geoalchemy2.shape import to_shape
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Location
-from app.schemas import LocationCreate, LocationResponse
+from app.schemas import LocationCreate, LocationListResponse, LocationResponse
 
 router = APIRouter(prefix="/locations", tags=["locations"])
+
+
+@router.get("/", response_model=LocationListResponse)
+async def list_locations(
+    state: str | None = Query(None),
+    district: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Return paginated list of locations with optional state/district filters.
+    """
+    offset = (page - 1) * page_size
+
+    conditions = []
+    params: dict = {"limit": page_size, "offset": offset}
+
+    if state:
+        conditions.append("state = :state")
+        params["state"] = state
+    if district:
+        conditions.append("district = :district")
+        params["district"] = district
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    results = db.execute(
+        text(f"""
+            SELECT id, place_name, district, state, location_type, score,
+                   ST_Y(coordinates::geometry) as lat,
+                   ST_X(coordinates::geometry) as lon
+            FROM locations
+            {where_clause}
+            ORDER BY score DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        params,
+    ).fetchall()
+
+    items = [
+        LocationResponse(
+            id=row.id,
+            latitude=row.lat,
+            longitude=row.lon,
+            district=row.district,
+            state=row.state,
+            place_name=row.place_name,
+            location_type=row.location_type,
+            score=row.score,
+        )
+        for row in results
+    ]
+
+    return LocationListResponse(page=page, page_size=page_size, results=items)
 
 
 @router.post("/", response_model=LocationResponse, status_code=201)

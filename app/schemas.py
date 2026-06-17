@@ -25,6 +25,12 @@ class LocationResponse(BaseModel):
         from_attributes = True
 
 
+class LocationListResponse(BaseModel):
+    page: int
+    page_size: int
+    results: list[LocationResponse]
+
+
 # --- Check-in schemas ---
 
 
@@ -112,3 +118,15 @@ class UserVisitsResponse(BaseModel):
     page: int
     page_size: int
     results: list[VisitItem]
+
+
+# --- Places tree schemas ---
+
+
+class StateNode(BaseModel):
+    state: str
+    districts: list[str]
+
+
+class PlacesTreeResponse(BaseModel):
+    states: list[StateNode]

@@ -86,6 +86,22 @@ CREATE TABLE user_scores (
 );"
 ```
 
+## 9. Create Places Table
+
+```bash
+psql -U trvlr_admin -d trvlr_db -c "
+CREATE TABLE places (
+    id SERIAL PRIMARY KEY,
+    district VARCHAR(255) NOT NULL UNIQUE,
+    state VARCHAR(255) NOT NULL
+);"
+```
+
+Seed with all Indian districts (names from OpenStreetMap):
+```bash
+.venv/bin/python scripts/seed_places.py
+```
+
 ### Schema
 
 | Column      | Type         | Notes                                    |

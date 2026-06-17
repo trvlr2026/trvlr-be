@@ -73,6 +73,7 @@ async def checkin(payload: CheckInRequest, db: Session = Depends(get_db)):
             visit = Visit(
                 user_id=payload.user_id,
                 location_id=location_id,
+                photo_id=coord.photo_id,
                 score=location_score,
             )
             db.add(visit)

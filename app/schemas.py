@@ -31,6 +31,7 @@ class LocationResponse(BaseModel):
 class Coordinate(BaseModel):
     lat: float
     lon: float
+    photo_id: str
 
 
 class CheckInRequest(BaseModel):
@@ -84,3 +85,25 @@ class LeaderboardResponse(BaseModel):
     page: int
     page_size: int
     results: list[LeaderboardEntry]
+
+
+# --- User visits schemas ---
+
+
+class VisitItem(BaseModel):
+    location_id: int
+    place_name: str
+    district: str
+    location_type: str
+    lat: float
+    lon: float
+    photo_id: str
+    score: int
+    visited_at: str
+
+
+class UserVisitsResponse(BaseModel):
+    user_id: str
+    page: int
+    page_size: int
+    results: list[VisitItem]

@@ -69,6 +69,7 @@ CREATE TABLE visits (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
     location_id INTEGER NOT NULL REFERENCES locations(id),
+    photo_id VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     score INTEGER DEFAULT 0,
     CONSTRAINT unique_user_location UNIQUE (user_id, location_id)

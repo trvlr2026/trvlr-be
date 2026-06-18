@@ -42,7 +42,17 @@ EOF
 
 ```bash
 cd /opt/trvlr-be
-.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+ps aux | grep uvicorn
+tail -f uvicorn.log
+
+stop all uvicorn processes:
+pkill -9 -f uvicorn
+
+nohup .venv/bin/uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port 8000 \
+  > uvicorn.log 2>&1 &
 ```
 
 Hit `http://YOUR_VPS_IP:8000/health` from your browser. If it returns `{"status":"ok"}`, you're good. Stop it with `Ctrl+C`.

@@ -4,12 +4,16 @@ Uses admin_level=5 (district level) boundaries within India.
 Names are exactly as used by OSM for consistency.
 """
 
+import os
 import time
 
 import requests
 import psycopg2
+from dotenv import load_dotenv
 
-DB_URL = "postgresql://trvlr_admin:trvlr2026!@localhost:5432/trvlr_db"
+load_dotenv()
+
+DB_URL = os.getenv("DATABASE_URL", "postgresql://trvlr_admin:trvlr2026!@localhost:5432/trvlr_db")
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 

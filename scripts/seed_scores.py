@@ -10,13 +10,17 @@ Run after seed_locations.py has populated the locations table.
 """
 
 import math
+import os
 import time
 import urllib.parse
 
 import requests
 import psycopg2
+from dotenv import load_dotenv
 
-DB_URL = "postgresql://trvlr_admin:trvlr2026!@localhost:5432/trvlr_db"
+load_dotenv()
+
+DB_URL = os.getenv("DATABASE_URL", "postgresql://trvlr_admin:trvlr2026!@localhost:5432/trvlr_db")
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 WIKI_PAGEVIEWS_URL = (

@@ -24,6 +24,7 @@ async def checkin(
     user_id = payload.user_id
     scores: list[ScoreItem] = []
     total_earned = 0
+    processed_locations = set()
 
     for coord in payload.coordinates:
         # Find the closest location within 100 meters
@@ -36,7 +37,7 @@ async def checkin(
                 WHERE ST_DWithin(
                     coordinates,
                     ST_MakePoint(:lon, :lat)::geography,
-                    100
+                    1000
                 )
                 ORDER BY ST_Distance(coordinates, ST_MakePoint(:lon, :lat)::geography)
                 LIMIT 1
@@ -52,6 +53,11 @@ async def checkin(
         location_score = result.score
         location_lat = result.lat
         location_lon = result.lon
+
+        if location_id in processed_locations:
+            continue
+
+        processed_locations.add(location_id)
 
         # Check if user already collected this score
         existing_visit = db.execute(

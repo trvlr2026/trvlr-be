@@ -66,7 +66,7 @@ def classify_element(tags: dict) -> str:
 
 
 def fetch_pois(district: str, bbox: tuple) -> list[dict]:
-    """Fetch POIs from Overpass API for a given bounding box."""
+    """Fetch POIs from Overpass API for a given bounding box with retry on 429/504."""
     query = build_query(bbox)
     print(f"Fetching POIs for {district}...")
 
@@ -74,14 +74,31 @@ def fetch_pois(district: str, bbox: tuple) -> list[dict]:
         "User-Agent": "trvlr-be/0.1 (seed script)",
         "Accept": "application/json",
     }
-    resp = requests.post(
-        OVERPASS_URL,
-        data={"data": query},
-        headers=headers,
-        timeout=120,
-    )
-    resp.raise_for_status()
-    data = resp.json()
+
+    for attempt in range(3):
+        try:
+            resp = requests.post(
+                OVERPASS_URL,
+                data={"data": query},
+                headers=headers,
+                timeout=120,
+            )
+            if resp.status_code in (429, 504):
+                wait = 2 ** (attempt + 1) * 10  # 20s, 40s, 80s
+                print(f"  Got {resp.status_code}, retrying in {wait}s (attempt {attempt + 1}/3)...")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            break
+        except requests.exceptions.Timeout:
+            wait = 2 ** (attempt + 1) * 10
+            print(f"  Timeout, retrying in {wait}s (attempt {attempt + 1}/3)...")
+            time.sleep(wait)
+            continue
+    else:
+        print(f"  Failed after 3 retries for {district}, skipping.")
+        return []
 
     results = []
     for element in data.get("elements", []):

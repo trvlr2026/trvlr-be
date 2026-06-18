@@ -73,31 +73,45 @@ out tags;"""
 
     print(f"Fetching districts for {state}...")
 
-    try:
-        resp = requests.post(
-            OVERPASS_URL,
-            data={"data": query},
-            headers=HEADERS,
-            timeout=120,
-        )
-        if resp.status_code != 200:
-            print(f"  Error {resp.status_code} for {state}, skipping...")
+    for attempt in range(3):
+        try:
+            resp = requests.post(
+                OVERPASS_URL,
+                data={"data": query},
+                headers=HEADERS,
+                timeout=120,
+            )
+            if resp.status_code in (429, 504):
+                wait = 2 ** (attempt + 1) * 10  # 20s, 40s, 80s
+                print(f"  Got {resp.status_code}, retrying in {wait}s (attempt {attempt + 1}/3)...")
+                time.sleep(wait)
+                continue
+            if resp.status_code != 200:
+                print(f"  Error {resp.status_code} for {state}, skipping...")
+                return []
+
+            data = resp.json()
+            districts = []
+            for element in data.get("elements", []):
+                tags = element.get("tags", {})
+                name = tags.get("name:en") or tags.get("name")
+                if name:
+                    districts.append(name)
+
+            print(f"  Found {len(districts)} districts")
+            return districts
+
+        except requests.exceptions.Timeout:
+            wait = 2 ** (attempt + 1) * 10
+            print(f"  Timeout, retrying in {wait}s (attempt {attempt + 1}/3)...")
+            time.sleep(wait)
+            continue
+        except Exception as e:
+            print(f"  Exception for {state}: {e}")
             return []
 
-        data = resp.json()
-        districts = []
-        for element in data.get("elements", []):
-            tags = element.get("tags", {})
-            name = tags.get("name:en") or tags.get("name")
-            if name:
-                districts.append(name)
-
-        print(f"  Found {len(districts)} districts")
-        return districts
-
-    except Exception as e:
-        print(f"  Exception for {state}: {e}")
-        return []
+    print(f"  Failed after 3 retries for {state}, skipping.")
+    return []
 
 
 def insert_places(places: list[dict]):

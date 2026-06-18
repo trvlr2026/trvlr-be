@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models import Location
 from app.schemas import LocationCreate, LocationListResponse, LocationResponse
@@ -16,6 +17,7 @@ async def list_locations(
     district: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -66,7 +68,11 @@ async def list_locations(
 
 
 @router.post("/", response_model=LocationResponse, status_code=201)
-async def create_location(payload: LocationCreate, db: Session = Depends(get_db)):
+async def create_location(
+    payload: LocationCreate,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     location = Location(
         coordinates=f"SRID=4326;POINT({payload.longitude} {payload.latitude})",
         district=payload.district,

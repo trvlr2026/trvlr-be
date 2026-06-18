@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.schemas import UserVisitsResponse, VisitItem, VisitLocationItem
 
@@ -13,6 +14,7 @@ async def get_user_visits(
     user_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.schemas import PlacesTreeResponse, StateNode
 
@@ -11,7 +12,10 @@ router = APIRouter(tags=["places"])
 
 
 @router.get("/places-tree", response_model=PlacesTreeResponse)
-async def get_places_tree(db: Session = Depends(get_db)):
+async def get_places_tree(
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Return a tree of state -> districts from the places table.
     """

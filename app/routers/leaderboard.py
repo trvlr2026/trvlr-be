@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.schemas import LeaderboardEntry, LeaderboardResponse
 
@@ -14,6 +15,7 @@ async def get_leaderboard(
     district: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -23,7 +25,6 @@ async def get_leaderboard(
     offset = (page - 1) * page_size
 
     if state or district:
-        # Filtered leaderboard: aggregate from visits joined with locations
         conditions = []
         params: dict = {"limit": page_size, "offset": offset}
 
@@ -49,7 +50,6 @@ async def get_leaderboard(
             params,
         ).fetchall()
     else:
-        # Global leaderboard from user_scores table
         results = db.execute(
             text("""
                 SELECT user_id, score

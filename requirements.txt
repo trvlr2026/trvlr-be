@@ -6,3 +6,7 @@ pydantic-settings==2.7.0
 geoalchemy2==0.17.1
 shapely==2.1.2
 requests==2.34.2
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+python-jose[cryptography]==3.5.0
+google-auth==2.55.0

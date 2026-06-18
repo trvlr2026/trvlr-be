@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.schemas import NearbyLocationItem, NearbyResponse
 
@@ -14,6 +15,7 @@ async def nearby_locations(
     lat: float = Query(...),
     lon: float = Query(...),
     radius: float = Query(..., description="Radius in metres"),
+    current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """

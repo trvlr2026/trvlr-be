@@ -46,3 +46,28 @@ class Place(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     district: Mapped[str] = mapped_column(String(255), unique=True)
     state: Mapped[str] = mapped_column(String(255))
+
+
+import uuid
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    display_name: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, server_default="now()")
+
+
+class AuthProvider(Base):
+    __tablename__ = "auth_providers"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_user_id", name="unique_provider_user"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)  # "local", "google", "apple"
+    provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)  # email for local, sub for google/apple
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)  # only for local

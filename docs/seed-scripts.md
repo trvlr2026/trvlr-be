@@ -7,6 +7,7 @@ Run these from the project root (`/opt/trvlr-be` on VPS or local).
 Fetches tourism/nature/historic POIs from OpenStreetMap for Karnataka districts.
 
 ```bash
+source .venv/bin/activate
 .venv/bin/python scripts/seed_locations.py
 ```
 

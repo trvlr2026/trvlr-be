@@ -130,3 +130,19 @@ class StateNode(BaseModel):
 
 class PlacesTreeResponse(BaseModel):
     states: list[StateNode]
+
+
+# --- Profile schemas ---
+
+
+class StateScore(BaseModel):
+    state: str
+    score: int
+
+
+class ProfileResponse(BaseModel):
+    user_name: str
+    user_email: str | None
+    total_score: int
+    total_places_visited_count: int
+    points_by_state: list[StateScore]

@@ -39,11 +39,12 @@ async def get_leaderboard(
 
         results = db.execute(
             text(f"""
-                SELECT v.user_id, SUM(v.score) as score
+                SELECT v.user_id, u.display_name as user_name, SUM(v.score) as score
                 FROM visits v
                 JOIN locations l ON l.id = v.location_id
+                LEFT JOIN users u ON u.id = v.user_id
                 {where_clause}
-                GROUP BY v.user_id
+                GROUP BY v.user_id, u.display_name
                 ORDER BY score DESC
                 LIMIT :limit OFFSET :offset
             """),
@@ -52,16 +53,17 @@ async def get_leaderboard(
     else:
         results = db.execute(
             text("""
-                SELECT user_id, score
-                FROM user_scores
-                ORDER BY score DESC
+                SELECT us.user_id, u.display_name as user_name, us.score
+                FROM user_scores us
+                LEFT JOIN users u ON u.id = us.user_id
+                ORDER BY us.score DESC
                 LIMIT :limit OFFSET :offset
             """),
             {"limit": page_size, "offset": offset},
         ).fetchall()
 
     entries = [
-        LeaderboardEntry(user_id=row.user_id, score=row.score)
+        LeaderboardEntry(user_id=row.user_id, user_name=row.user_name or "", score=row.score)
         for row in results
     ]
 

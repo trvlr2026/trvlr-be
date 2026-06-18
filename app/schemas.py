@@ -84,6 +84,7 @@ class NearbyResponse(BaseModel):
 
 class LeaderboardEntry(BaseModel):
     user_id: str
+    user_name: str
     score: int
 
 

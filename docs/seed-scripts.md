@@ -39,6 +39,9 @@ sudo -u postgres psql -d trvlr_db -c "UPDATE locations SET score = floor(random(
 
 # On local Mac
 psql -U trvlr_admin -d trvlr_db -c "UPDATE locations SET score = floor(random() * 100 + 1);"
+
+nohup .venv/bin/python -u scripts/seed_locations.py > seed_locations.log 2>&1 &
+tail -f seed_locations.log
 ```
 
 ## Run Order

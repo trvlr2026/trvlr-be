@@ -1,12 +1,13 @@
 """
-Score script: Calculates a 1-100 popularity score for each location
-using OSM tag signals + Wikipedia pageview data.
+Scoring script: Calculates a 1-100 score for each location based on:
+1. Wikipedia pageviews (popularity signal)
+2. location_type (type-based base score)
+3. Wikipedia article existence (wiki bonus)
 
-Scoring breakdown (1-100):
-- OSM tag signals: 0-30 points (notability/richness)
-- Wikipedia pageviews: 0-70 points (actual public interest)
+Only processes locations with score=0 (retryable).
+Retries on 429/503/504 with exponential backoff.
 
-Run after seed_locations.py has populated the locations table.
+Formula: score = min(100, max(1, type_base_score + pageview_score + wiki_bonus))
 """
 
 import math
@@ -22,181 +23,172 @@ load_dotenv()
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql://trvlr_admin:trvlr2026!@localhost:5432/trvlr_db")
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 WIKI_PAGEVIEWS_URL = (
     "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article"
     "/en.wikipedia/all-access/all-agents/{title}/monthly/20250101/20260101"
 )
 
 HEADERS = {
-    "User-Agent": "trvlr-be/0.1 (scoring script; contact: dev@trvlr.app)",
+    "User-Agent": "trvlr-be/0.1 (scoring script)",
 }
 
-# --- OSM Tag Scoring (0-30 points) ---
+# --- Type-based base scores (Tier E from scoring-system.md) ---
 
-# Points for having these tags present
-TAG_PRESENCE_SCORES = {
-    "wikipedia": 8,
-    "wikidata": 5,
-    "website": 4,
-    "contact:website": 4,
-    "opening_hours": 3,
-    "phone": 2,
-    "contact:phone": 2,
-    "description": 3,
-    "image": 3,
+TYPE_BASE_SCORES = {
+    "tourism:attraction": 30,
+    "historic:fort": 28,
+    "historic:castle": 28,
+    "historic:monument": 25,
+    "historic:archaeological_site": 25,
+    "leisure:nature_reserve": 25,
+    "natural:waterfall": 25,
+    "tourism:museum": 22,
+    "natural:peak": 20,
+    "tourism:zoo": 20,
+    "natural:cave_entrance": 18,
+    "leisure:park": 18,
+    "tourism:viewpoint": 15,
+    "leisure:garden": 15,
+    "historic:ruins": 15,
+    "historic:temple": 20,
+    "tourism:artwork": 12,
+    "leisure:sports_centre": 10,
+    "leisure:playground": 10,
+    "leisure:swimming_pool": 8,
+    "leisure:stadium": 12,
+    "natural:hot_spring": 20,
+    "natural:water": 15,
+    "tourism:hotel": 5,
+    "tourism:guest_house": 5,
+    "tourism:camp_site": 10,
+    "tourism:picnic_site": 8,
+    "tourism:theme_park": 22,
+    "leisure:water_park": 18,
 }
 
-# Points for specific tag values (tourism/historic significance)
-TYPE_VALUE_SCORES = {
-    "tourism:attraction": 6,
-    "tourism:museum": 5,
-    "tourism:zoo": 5,
-    "tourism:theme_park": 5,
-    "tourism:viewpoint": 4,
-    "tourism:artwork": 3,
-    "historic:fort": 6,
-    "historic:monument": 5,
-    "historic:castle": 6,
-    "historic:ruins": 4,
-    "historic:temple": 5,
-    "historic:archaeological_site": 5,
-    "natural:waterfall": 5,
-    "natural:peak": 4,
-    "natural:cave_entrance": 4,
-    "natural:hot_spring": 4,
-    "leisure:park": 3,
-    "leisure:nature_reserve": 5,
-    "leisure:garden": 3,
-    "leisure:water_park": 4,
-}
-
-# Points for multiple language names
-def language_name_score(tags: dict) -> int:
-    """More translations = more internationally known."""
-    lang_names = sum(1 for k in tags if k.startswith("name:"))
-    if lang_names >= 5:
-        return 5
-    elif lang_names >= 3:
-        return 3
-    elif lang_names >= 1:
-        return 1
-    return 0
+DEFAULT_TYPE_SCORE = 10
 
 
-def calculate_osm_score(tags: dict) -> int:
-    """Calculate OSM-based score (0-30) from element tags."""
-    score = 0
-
-    # Tag presence
-    for tag, points in TAG_PRESENCE_SCORES.items():
-        if tag in tags:
-            score += points
-
-    # Type value significance
-    for key in ["tourism", "historic", "natural", "leisure"]:
-        if key in tags:
-            type_key = f"{key}:{tags[key]}"
-            score += TYPE_VALUE_SCORES.get(type_key, 1)
-
-    # Language names
-    score += language_name_score(tags)
-
-    return min(30, score)
+# --- Helpers ---
 
 
-# --- Wikipedia Pageview Scoring (0-70 points) ---
+def request_with_retry(url: str) -> requests.Response | None:
+    """GET request with retry on 429/503/504, exponential backoff."""
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
 
-def get_wikipedia_title(tags: dict) -> str | None:
-    """Extract Wikipedia article title from OSM tags."""
-    wiki = tags.get("wikipedia", "")
-    if wiki.startswith("en:"):
-        return wiki[3:]
-    elif ":" in wiki:
-        # Non-English article, skip for now
-        return None
-    elif wiki:
-        return wiki
+            if resp.status_code in (429, 503, 504):
+                wait = 2 ** (attempt + 1) * 5  # 10s, 20s, 40s
+                print(f"    Got {resp.status_code}, retrying in {wait}s (attempt {attempt + 1}/3)...")
+                time.sleep(wait)
+                continue
+
+            return resp
+
+        except requests.exceptions.Timeout:
+            wait = 2 ** (attempt + 1) * 5
+            print(f"    Timeout, retrying in {wait}s (attempt {attempt + 1}/3)...")
+            time.sleep(wait)
+            continue
+        except Exception as e:
+            print(f"    Exception: {e}")
+            return None
+
+    print("    Failed after 3 retries.")
     return None
 
 
-def fetch_pageviews(title: str) -> int:
-    """Fetch total monthly pageviews from Wikipedia API."""
-    encoded_title = urllib.parse.quote(title.replace(" ", "_"), safe="")
+def get_type_base_score(location_type: str) -> int:
+    """Get base score from location_type."""
+    return TYPE_BASE_SCORES.get(location_type, DEFAULT_TYPE_SCORE)
+
+
+def normalize_name_for_wiki(name: str) -> str:
+    """Convert a place name to a Wikipedia article title format."""
+    # Replace spaces with underscores, capitalize first letter
+    title = name.strip().replace(" ", "_")
+    return title
+
+
+def fetch_pageviews(title: str) -> int | None:
+    """
+    Fetch average monthly pageviews from Wikipedia.
+    Returns avg views/month, or None if article not found or API fails.
+    """
+    encoded_title = urllib.parse.quote(title, safe="")
     url = WIKI_PAGEVIEWS_URL.format(title=encoded_title)
 
+    resp = request_with_retry(url)
+    if not resp:
+        return None  # Retry failed — leave score as 0 for next run
+
+    if resp.status_code == 404:
+        return 0  # Article doesn't exist — that's a valid result
+
+    if resp.status_code != 200:
+        return None  # Unexpected error — skip for retry
+
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        if resp.status_code != 200:
-            return 0
         data = resp.json()
         items = data.get("items", [])
+        if not items:
+            return 0
         total = sum(item.get("views", 0) for item in items)
-        # Return average monthly views
-        months = len(items) if items else 1
-        return total // months
+        return total // len(items)  # Average monthly views
     except Exception:
+        return None
+
+
+def calculate_pageview_score(avg_views: int) -> int:
+    """
+    Convert average monthly pageviews to a 0-60 score using log scale.
+    - 0 views → 0
+    - 100 views → ~15
+    - 1000 views → ~30
+    - 5000 views → ~45
+    - 20000+ views → 55-60
+    """
+    if avg_views <= 0:
         return 0
 
-
-def calculate_pageview_score(views: int, max_views: int) -> int:
-    """Normalize pageviews to 0-70 using log scale."""
-    if views <= 0 or max_views <= 0:
-        return 0
-    # Log scale normalization
-    log_views = math.log1p(views)
-    log_max = math.log1p(max_views)
-    normalized = log_views / log_max
-    return min(70, round(normalized * 70))
+    # Log scale: log10(views) mapped to 0-60
+    # log10(100)=2, log10(1000)=3, log10(10000)=4, log10(100000)=5
+    log_views = math.log10(avg_views)
+    # Scale: 2→15, 3→30, 4→45, 5→60
+    score = int((log_views - 1) * 15)
+    return max(0, min(60, score))
 
 
-# --- Fetch OSM tags for existing locations ---
-
-def fetch_osm_tags_for_location(place_name: str, lat: float, lon: float) -> dict:
-    """Fetch OSM tags for a specific location by searching nearby."""
-    query = f"""[out:json][timeout:30];
-(
-  node["name"="{place_name}"](around:500,{lat},{lon});
-  way["name"="{place_name}"](around:500,{lat},{lon});
-);
-out tags;"""
-
-    try:
-        resp = requests.post(
-            OVERPASS_URL,
-            data={"data": query},
-            headers=HEADERS,
-            timeout=30,
-        )
-        if resp.status_code != 200:
-            return {}
-        data = resp.json()
-        elements = data.get("elements", [])
-        if elements:
-            return elements[0].get("tags", {})
-    except Exception:
-        pass
-    return {}
+def calculate_wiki_bonus(has_article: bool) -> int:
+    """Bonus for having a Wikipedia article."""
+    return 5 if has_article else 0
 
 
-# --- Main ---
+# --- DB operations ---
 
-def get_locations():
-    """Fetch all locations from the database."""
+
+def get_unscored_locations() -> list[dict]:
+    """Get all locations with score=0."""
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
     cur.execute("""
-        SELECT id, place_name, ST_Y(coordinates::geometry) as lat, ST_X(coordinates::geometry) as lon
+        SELECT id, place_name, location_type, district, state
         FROM locations
+        WHERE score = 0
+        ORDER BY id
     """)
-    rows = cur.fetchall()
+    rows = [
+        {"id": r[0], "name": r[1], "location_type": r[2], "district": r[3], "state": r[4]}
+        for r in cur.fetchall()
+    ]
     cur.close()
     conn.close()
     return rows
 
 
 def update_score(location_id: int, score: int):
-    """Update the score for a location."""
+    """Update score for a single location."""
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
     cur.execute("UPDATE locations SET score = %s WHERE id = %s", (score, location_id))
@@ -205,56 +197,70 @@ def update_score(location_id: int, score: int):
     conn.close()
 
 
+# --- Main ---
+
+
+def compute_score(location: dict) -> int | None:
+    """
+    Compute score for a location.
+    Returns score (1-100) or None if we should skip (API failure, retry later).
+    """
+    name = location["name"]
+    location_type = location["location_type"]
+
+    # Step 1: Type-based base score
+    type_score = get_type_base_score(location_type)
+
+    # Step 2: Try Wikipedia pageviews
+    wiki_title = normalize_name_for_wiki(name)
+    pageviews = fetch_pageviews(wiki_title)
+
+    if pageviews is None:
+        # API call failed after retries — skip, leave score=0 for next run
+        return None
+
+    # Step 3: Calculate components
+    pageview_score = calculate_pageview_score(pageviews)
+    wiki_bonus = calculate_wiki_bonus(pageviews > 0)
+
+    # Step 4: Combine
+    total = type_score + pageview_score + wiki_bonus
+    final_score = max(1, min(100, total))
+
+    return final_score
+
+
 def main():
-    locations = get_locations()
-    print(f"Scoring {len(locations)} locations...\n")
+    locations = get_unscored_locations()
+    print(f"Found {len(locations)} locations with score=0\n")
 
-    # Phase 1: Collect OSM scores and Wikipedia pageviews
-    scored = []
+    if not locations:
+        print("Nothing to score. All locations already have scores.")
+        return
 
-    for loc_id, place_name, lat, lon in locations:
-        print(f"Processing: {place_name}...")
+    scored = 0
+    skipped = 0
 
-        # Fetch OSM tags
-        tags = fetch_osm_tags_for_location(place_name, lat, lon)
-        osm_score = calculate_osm_score(tags)
+    for i, loc in enumerate(locations, 1):
+        print(f"[{i}/{len(locations)}] {loc['name']} ({loc['location_type']})")
 
-        # Fetch Wikipedia pageviews
-        wiki_title = get_wikipedia_title(tags)
-        pageviews = 0
-        if wiki_title:
-            pageviews = fetch_pageviews(wiki_title)
-            print(f"  Wikipedia: '{wiki_title}' → {pageviews} avg views/month")
-            time.sleep(0.1)  # Be polite to Wikipedia API
+        score = compute_score(loc)
 
-        print(f"  OSM score: {osm_score}/30, Pageviews: {pageviews}")
+        if score is None:
+            print(f"  → Skipped (API failure, will retry next run)")
+            skipped += 1
+            continue
 
-        scored.append({
-            "id": loc_id,
-            "name": place_name,
-            "osm_score": osm_score,
-            "pageviews": pageviews,
-        })
+        update_score(loc["id"], score)
+        print(f"  → Score: {score}")
+        scored += 1
 
-        time.sleep(2)  # Be polite to Overpass API
+        # Rate limit: Wikipedia allows 200 req/s, but be polite
+        time.sleep(0.2)
 
-    # Phase 2: Normalize pageviews and compute final scores
-    max_views = max((s["pageviews"] for s in scored), default=1)
-    if max_views == 0:
-        max_views = 1
-
-    print(f"\nMax pageviews: {max_views}")
-    print("=" * 60)
-
-    for item in scored:
-        pageview_score = calculate_pageview_score(item["pageviews"], max_views)
-        final_score = max(1, item["osm_score"] + pageview_score)  # Minimum score of 1
-        final_score = min(100, final_score)  # Cap at 100
-
-        print(f"{item['name']:40s} OSM={item['osm_score']:2d} + Wiki={pageview_score:2d} = {final_score:3d}")
-        update_score(item["id"], final_score)
-
-    print(f"\nDone! Updated scores for {len(scored)} locations.")
+    print(f"\n{'='*50}")
+    print(f"Done! Scored: {scored}, Skipped (retry later): {skipped}")
+    print(f"Remaining unscored: {len(locations) - scored}")
 
 
 if __name__ == "__main__":

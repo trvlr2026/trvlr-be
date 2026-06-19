@@ -12,10 +12,12 @@ class Location(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     coordinates = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=False)
+    boundary = mapped_column(Geography(geometry_type="POLYGON", srid=4326), nullable=True)
     district: Mapped[str] = mapped_column(String(255))
     state: Mapped[str] = mapped_column(String(255))
     place_name: Mapped[str] = mapped_column(String(255), unique=True)
     location_type: Mapped[str] = mapped_column(String(100))
+    radius_m: Mapped[int] = mapped_column(Integer, default=100, server_default="100")
     score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 

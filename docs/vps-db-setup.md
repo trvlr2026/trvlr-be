@@ -221,3 +221,23 @@ Exposing PostgreSQL to `0.0.0.0/0` means anyone can attempt to connect. For prod
 - Use a strong password (done)
 - Restrict to your IP: replace `0.0.0.0/0` with `YOUR_IP/32` in pg_hba.conf
 - Consider using SSH tunneling instead of direct exposure
+
+## 9. Schema Migrations (ALTER commands)
+
+Run these after initial setup to add newer columns:
+
+```bash
+# Add radius_m column
+sudo -u postgres psql -d trvlr_db -c "ALTER TABLE locations ADD COLUMN radius_m INTEGER DEFAULT 100;"
+
+# Add boundary polygon column
+sudo -u postgres psql -d trvlr_db -c "ALTER TABLE locations ADD COLUMN boundary GEOGRAPHY(POLYGON, 4326);"
+```
+
+## 10. Reset Data
+
+To wipe locations and visits and start fresh (re-seed):
+
+```bash
+sudo -u postgres psql -d trvlr_db -c "TRUNCATE TABLE visits, locations CASCADE;"
+```

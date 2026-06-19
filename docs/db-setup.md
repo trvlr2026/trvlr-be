@@ -172,3 +172,24 @@ CREATE TABLE locations (
     score INTEGER DEFAULT 0
 );"
 ```
+
+
+## Schema Migrations (ALTER commands)
+
+Run these after initial setup to add newer columns:
+
+```bash
+# Add radius_m column
+psql -U trvlr_admin -d trvlr_db -c "ALTER TABLE locations ADD COLUMN radius_m INTEGER DEFAULT 100;"
+
+# Add boundary polygon column
+psql -U trvlr_admin -d trvlr_db -c "ALTER TABLE locations ADD COLUMN boundary GEOGRAPHY(POLYGON, 4326);"
+```
+
+## Reset Data
+
+To wipe locations and visits and start fresh (re-seed):
+
+```bash
+psql -U trvlr_admin -d trvlr_db -c "TRUNCATE TABLE visits, locations CASCADE;"
+```

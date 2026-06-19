@@ -46,3 +46,15 @@ psql -U trvlr_admin -d trvlr_db -c "UPDATE locations SET score = floor(random() 
 1. `seed_locations.py` (populate locations)
 2. Randomize scores (assign scores to locations)
 3. `seed_places.py` (populate districts/states reference table)
+
+## Reset Data
+
+To wipe locations and visits and start fresh:
+
+```bash
+# On VPS
+sudo -u postgres psql -d trvlr_db -c "TRUNCATE TABLE visits, locations CASCADE;"
+
+# On local Mac
+psql -U trvlr_admin -d trvlr_db -c "TRUNCATE TABLE visits, locations CASCADE;"
+```

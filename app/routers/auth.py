@@ -71,6 +71,13 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)):
         password_hash=hash_password(payload.password),
     )
     db.add(auth_provider)
+
+    # Initialize user_scores with 0
+    db.execute(
+        text("INSERT INTO user_scores (user_id, score) VALUES (:user_id, 0)"),
+        {"user_id": user.id},
+    )
+
     db.commit()
 
     token = create_access_token(user.id)
@@ -178,6 +185,13 @@ async def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db))
         provider_user_id=google_sub,
     )
     db.add(auth_provider)
+
+    # Initialize user_scores with 0
+    db.execute(
+        text("INSERT INTO user_scores (user_id, score) VALUES (:user_id, 0)"),
+        {"user_id": user.id},
+    )
+
     db.commit()
 
     token = create_access_token(user.id)

@@ -19,6 +19,8 @@ class LocationResponse(BaseModel):
     state: str
     place_name: str
     location_type: str
+    radius_m: int
+    boundary: list[list[float]] | None = None  # [[lon, lat], ...] or null
     score: int
 
     class Config:
@@ -69,6 +71,8 @@ class NearbyLocationItem(BaseModel):
     place_name: str
     district: str
     location_type: str
+    radius_m: int
+    boundary: list[list[float]] | None = None
     score: int
     distance_m: float
     visited: bool
@@ -104,6 +108,7 @@ class VisitLocationItem(BaseModel):
     place_name: str
     district: str
     location_type: str
+    radius_m: int
     score: int
 
 

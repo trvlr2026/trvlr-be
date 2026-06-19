@@ -8,6 +8,22 @@ from app.database import get_db
 from app.models import Location
 from app.schemas import LocationCreate, LocationListResponse, LocationResponse
 
+
+def parse_wkt_polygon(wkt: str | None) -> list[list[float]] | None:
+    """Parse WKT POLYGON string to list of [lon, lat] pairs."""
+    if not wkt or not wkt.startswith("POLYGON"):
+        return None
+    try:
+        # Extract coordinates from POLYGON((lon lat, lon lat, ...))
+        inner = wkt.replace("POLYGON((", "").replace("))", "")
+        coords = []
+        for pair in inner.split(","):
+            parts = pair.strip().split(" ")
+            coords.append([float(parts[0]), float(parts[1])])
+        return coords
+    except Exception:
+        return None
+
 router = APIRouter(prefix="/locations", tags=["locations"])
 
 
@@ -39,9 +55,10 @@ async def list_locations(
 
     results = db.execute(
         text(f"""
-            SELECT id, place_name, district, state, location_type, score,
+            SELECT id, place_name, district, state, location_type, radius_m, score,
                    ST_Y(coordinates::geometry) as lat,
-                   ST_X(coordinates::geometry) as lon
+                   ST_X(coordinates::geometry) as lon,
+                   ST_AsText(boundary::geometry) as boundary_wkt
             FROM locations
             {where_clause}
             ORDER BY score DESC
@@ -59,6 +76,8 @@ async def list_locations(
             state=row.state,
             place_name=row.place_name,
             location_type=row.location_type,
+            radius_m=row.radius_m or 100,
+            boundary=parse_wkt_polygon(row.boundary_wkt),
             score=row.score,
         )
         for row in results
@@ -94,5 +113,7 @@ async def create_location(
         state=location.state,
         place_name=location.place_name,
         location_type=location.location_type,
+        radius_m=location.radius_m or 100,
+        boundary=None,
         score=location.score,
     )

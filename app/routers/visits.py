@@ -32,6 +32,7 @@ async def get_user_visits(
                 l.place_name,
                 l.district,
                 l.location_type,
+                l.radius_m,
                 l.score as location_score,
                 ST_Y(l.coordinates::geometry) as lat,
                 ST_X(l.coordinates::geometry) as lon
@@ -56,6 +57,7 @@ async def get_user_visits(
                 place_name=row.place_name,
                 district=row.district,
                 location_type=row.location_type,
+                radius_m=row.radius_m or 100,
                 score=row.location_score,
             ),
         )

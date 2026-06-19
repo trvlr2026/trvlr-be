@@ -114,30 +114,46 @@ def normalize_name_for_wiki(name: str) -> str:
 def fetch_pageviews(title: str) -> int | None:
     """
     Fetch average monthly pageviews from Wikipedia.
-    Returns avg views/month, or None if article not found or API fails.
+    Returns avg views/month, or None if we should retry later (API overloaded).
+    Returns 0 if article doesn't exist (valid result — no pageviews).
     """
     encoded_title = urllib.parse.quote(title, safe="")
     url = WIKI_PAGEVIEWS_URL.format(title=encoded_title)
 
-    resp = request_with_retry(url)
-    if not resp:
-        return None  # Retry failed — leave score as 0 for next run
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=15)
 
-    if resp.status_code == 404:
-        return 0  # Article doesn't exist — that's a valid result
+            if resp.status_code == 404:
+                return 0  # Article doesn't exist — valid, score by type only
 
-    if resp.status_code != 200:
-        return None  # Unexpected error — skip for retry
+            if resp.status_code in (429, 503, 504):
+                wait = 2 ** (attempt + 1) * 5
+                print(f"    Wiki API {resp.status_code}, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
 
-    try:
-        data = resp.json()
-        items = data.get("items", [])
-        if not items:
+            if resp.status_code != 200:
+                # Other errors (400, etc.) — treat as "no article"
+                return 0
+
+            data = resp.json()
+            items = data.get("items", [])
+            if not items:
+                return 0
+            total = sum(item.get("views", 0) for item in items)
+            return total // len(items)
+
+        except requests.exceptions.Timeout:
+            wait = 2 ** (attempt + 1) * 5
+            print(f"    Wiki API timeout, retrying in {wait}s...")
+            time.sleep(wait)
+            continue
+        except Exception:
             return 0
-        total = sum(item.get("views", 0) for item in items)
-        return total // len(items)  # Average monthly views
-    except Exception:
-        return None
+
+    # All retries exhausted on 429/503/504 — this is a real failure
+    return None
 
 
 def calculate_pageview_score(avg_views: int) -> int:
